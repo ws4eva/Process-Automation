@@ -11,8 +11,10 @@ import ctypes
 # Version info
 ''' 
 ### Change Note ###
-- Version: 1.0
-- Initial release
+- Version: 1.1.0
+- Change description:
+- Added a feature to log the list of files in 'copied_files.txt' that have been copied before copying files to the server. 
+- If the text file doesn't exist, it will create a new one from function `load_copied_files()`.
 
 '''
 
@@ -20,6 +22,8 @@ import ctypes
 log_file_path = 'log.log'
 logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
 
+# File to store the list of copied files
+copied_files_file = 'copied_files.txt'
 
 # Function to read information from config file
 def read_config(config_dir):
@@ -40,12 +44,28 @@ def read_config(config_dir):
         logging.info(log_entry)
         return None
 
+# Function to load the set of copied files from a file
+def load_copied_files():
+    try:
+        with open(copied_files_file, 'r') as file:
+            return set(file.read().splitlines())
+    except FileNotFoundError:
+        # Create the file if it doesn't exist
+        with open(copied_files_file, 'w'):
+            pass
+        return set()
+
 # Function to read csv files
 def read_csv_files(data_dir, db_dir, rig_name):
     sn_list = [] # List to store serial numbers
     timestamp_list = [] # List to store timestamp
-    file_count = 0
+    file_count = 1
+
+    # Load the set of copied files from the file
+    copied_files_set = load_copied_files()
+
     print('Reading csv files in progress...')
+    
     for root, dirs, files in os.walk(data_dir):
         for file in files:
             if file.startswith("Summary_") and file.endswith(".csv"):
@@ -53,29 +73,33 @@ def read_csv_files(data_dir, db_dir, rig_name):
                 
                 # Extract the serial number from the file path
                 sn, timestamp = extract_serial_number(file_path)
-                if sn:
+                
+                if sn and file not in copied_files_set:
                     sn_list.append(sn)
                     timestamp_list.append(timestamp)
                     file_count += 1
                     process_csv_file(file_path, db_dir, rig_name, sn, file_count)
+                    copied_files_set.add(file)
+                else:
+                    print(f"Checked file #{file_count}")
+                    file_count += 1
+    # Save the updated set of copied files to the file
+    save_copied_files(copied_files_set)
                 
 # Function to process csv files
 def process_csv_file(file_path, db_dir, rig_name, sn, file_count):
     # Create a new file name by appending [SN] to the original file name
     base_name = os.path.basename(file_path)
     new_name = f"{sn}_{rig_name}_{base_name}"
-
-   # Check if the file already exists in the destination directory
     destination_path = os.path.join(db_dir, new_name)
     
-    if not os.path.exists(destination_path):
-        # Copy the CSV file to the specified database directory with the new name
-        shutil.copy(file_path, destination_path)
-        print(f"File copied to {destination_path}")
-        log_entry = f"SN added: {sn}"
-        logging.info(log_entry)
-    else:
-        print(f"Checking file #{file_count}")
+    # Copy the CSV file to the specified database directory with the new name
+    shutil.copy(file_path, destination_path)
+    print(f"File copied to {destination_path}")
+    
+    log_entry = f"SN added: {sn}"
+    logging.info(log_entry)
+
 
 def extract_serial_number(file_path):
     # Split the file path using backslashes
@@ -91,6 +115,19 @@ def extract_serial_number(file_path):
         return sn, time_stamp
     else:
         return None
+
+# Function to load the set of copied files from a file
+def load_copied_files():
+    try:
+        with open(copied_files_file, 'r') as file:
+            return set(file.read().splitlines())
+    except FileNotFoundError:
+        return set()
+
+# Function to save the set of copied files to a file
+def save_copied_files(copied_files_set):
+    with open(copied_files_file, 'w') as file:
+        file.write('\n'.join(copied_files_set))
 
 def main():
     # Set default directory
