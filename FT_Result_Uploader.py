@@ -11,11 +11,10 @@ import ctypes
 # Version info
 ''' 
 ### Change Note ###
-- Version: 1.1.0
+- Version: 1.2.0
 - Change description:
-- Added a feature to log the list of files in 'copied_files.txt' that have been copied before copying files to the server. 
-- If the text file doesn't exist, it will create a new one from function `load_copied_files()`.
-
+- Fixed a bug for not copying all summary files due to file name created with same timestamp when units were tested together.
+- `copied_files.txt` file stores `SN_filename` format and updated the code to check against exact name.
 '''
 
 # Set up logging
@@ -73,13 +72,13 @@ def read_csv_files(data_dir, db_dir, rig_name):
                 
                 # Extract the serial number from the file path
                 sn, timestamp = extract_serial_number(file_path)
-                
-                if sn and file not in copied_files_set:
+                file_name = str(sn + "_" + file)
+                if file_name not in copied_files_set:
                     sn_list.append(sn)
                     timestamp_list.append(timestamp)
                     file_count += 1
                     process_csv_file(file_path, db_dir, rig_name, sn, file_count)
-                    copied_files_set.add(file)
+                    copied_files_set.add(sn + "_" + file)
                 else:
                     print(f"Checked file #{file_count}")
                     file_count += 1
